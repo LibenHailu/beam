@@ -565,8 +565,8 @@ def run_inference(
   if not model_handler_provider_type:
     raise NotImplementedError(f'Unknown model handler type: {typ}.')
 
+  model_handler_provider_type.validate(model_handler['config'])
   model_handler_provider = ModelHandlerProvider.create_handler(model_handler)
-  model_handler_provider.validate(model_handler['config'])
   schema = RowTypeConstraint.from_fields(
       named_fields_from_element_type(pcoll.element_type) +
       [(str(inference_tag), model_handler_provider.inference_output_type())])

@@ -276,12 +276,11 @@ def _create_formatter(
     format, schema: Any,
     beam_schema: schema_pb2.Schema) -> Callable[[beam.Row], bytes]:
 
-  if format.islower():
-    format = format.upper()
+  format = format.upper()
 
-  if format == 'RAW':
+  if format in ('RAW', 'STRING'):
     if schema:
-      raise ValueError('RAW format does not take a schema')
+      raise ValueError(f'{format} format does not take a schema')
     field_names = [field.name for field in beam_schema.fields]
     if len(field_names) != 1:
       raise ValueError(f'Expecting exactly one field, found {field_names}')
@@ -821,9 +820,11 @@ def read_from_tfrecord(
     validate (bool): Boolean flag to verify that the files exist during the
       pipeline creation time.
   """
+  if not hasattr(CompressionTypes, compression_type.upper()):
+    raise ValueError(f'Unknown compression type: {compression_type}')
   return ReadFromTFRecord(
       file_pattern=file_pattern,
-      compression_type=getattr(CompressionTypes, compression_type),
+      compression_type=getattr(CompressionTypes, compression_type.upper()),
       validate=validate) | beam.Map(lambda s: beam.Row(record=s))
 
 
@@ -875,6 +876,8 @@ def write_to_tfrecord(
         % field_names)
   sole_field_name, = field_names
 
+  if not hasattr(CompressionTypes, compression_type.upper()):
+    raise ValueError(f'Unknown compression type: {compression_type}')
   return pcoll | beam.Map(
       lambda x: getattr(x, sole_field_name)) | WriteToTFRecord(
           file_path_prefix=file_path_prefix,
@@ -882,7 +885,7 @@ def write_to_tfrecord(
           file_name_suffix=file_name_suffix,
           num_shards=num_shards,
           shard_name_template=shard_name_template,
-          compression_type=getattr(CompressionTypes, compression_type))
+          compression_type=getattr(CompressionTypes, compression_type.upper()))
 
 
 @beam.ptransform_fn

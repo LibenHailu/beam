@@ -494,6 +494,28 @@ class YamlPubSubTest(unittest.TestCase):
               format: RAW
             '''))
 
+  def test_simple_write_string_and_mixed_case_format(self):
+    for fmt in ('STRING', 'Raw'):
+      with self.subTest(format=fmt):
+        with beam.Pipeline(
+            options=beam.options.pipeline_options.PipelineOptions(
+                pickle_library='cloudpickle')) as p:
+          with mock.patch('apache_beam.io.WriteToPubSub',
+                          FakeWriteToPubSub(topic='my_topic',
+                                            messages=[PubsubMessage(b'msg1',
+                                                                    {}),
+                                                      PubsubMessage(b'msg2',
+                                                                    {})])):
+            _ = (
+                p | beam.Create([beam.Row(a='msg1'), beam.Row(a='msg2')])
+                | YamlTransform(
+                    f'''
+                type: WriteToPubSub
+                config:
+                  topic: my_topic
+                  format: {fmt}
+                '''))
+
   def test_write_with_attribute(self):
     with beam.Pipeline(options=beam.options.pipeline_options.PipelineOptions(
         pickle_library='cloudpickle')) as p:
@@ -1002,6 +1024,21 @@ class YamlDeltaTest(unittest.TestCase):
         include_metadata_columns=["_change_type"])
     self.assertIsInstance(transform, beam.managed.Read)
     self.assertEqual(transform._source, "delta_cdc")
+
+
+class YamlTFRecordValidationTest(unittest.TestCase):
+  def test_read_from_tfrecord_invalid_compression_type(self):
+    from apache_beam.yaml.yaml_io import read_from_tfrecord
+    with self.assertRaisesRegex(ValueError, 'Unknown compression type: BAD'):
+      read_from_tfrecord(file_pattern='*.tfrecord', compression_type='BAD')
+
+  def test_write_to_tfrecord_invalid_compression_type(self):
+    from apache_beam.yaml.yaml_io import write_to_tfrecord
+    with self.assertRaisesRegex(ValueError, 'Unknown compression type: BAD'):
+      p = beam.Pipeline()
+      _ = (
+          p | beam.Create([beam.Row(record=b'a')])
+          | write_to_tfrecord(file_path_prefix='out', compression_type='BAD'))
 
 
 @unittest.skipIf(

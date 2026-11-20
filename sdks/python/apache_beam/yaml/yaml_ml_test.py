@@ -312,6 +312,30 @@ class RunInferenceJobSubmissionTest(unittest.TestCase):
           pipeline.to_runner_api(), pipeline.runner, pipeline.options)
     self.assertEqual(attempted_imports, [])
 
+  def test_huggingface_model_handler_validates_before_instantiation(self):
+    from apache_beam.yaml import yaml_ml  # pylint: disable=unused-import
+    ml_opts = beam.options.pipeline_options.PipelineOptions(
+        pickle_library='cloudpickle', yaml_experimental_features=['ML'])
+    with test_utils.block_imports('transformers'):
+      with self.assertRaisesRegex(
+          ValueError,
+          "HuggingFacePipelineModelHandler requires either 'task' or 'model'"):
+        pipeline = beam.Pipeline(options=ml_opts)
+        _ = pipeline | YamlTransform(
+            '''
+            type: chain
+            transforms:
+              - type: Create
+                config:
+                  elements:
+                    - {text: "I love Apache Beam!"}
+              - type: RunInference
+                config:
+                  model_handler:
+                    type: HuggingFacePipelineModelHandler
+                    config: {}
+            ''')
+
 
 if __name__ == '__main__':
   logging.getLogger().setLevel(logging.INFO)
